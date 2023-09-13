@@ -10,49 +10,91 @@ public class AssetCollectorWindow : EditorWindow
     private static List<Object> collectedAssets = new List<Object>();
     private static List<string> collectedFolders = new List<string>();
     private const string prefKey = "CollectedAssets";
+
     private const string locateInProjectPrefKey = "LocateInProject";
+
+    // NoteBook
+    private static string notebookContent = "";
+    private const string notebookPrefKey = "NotebookContent";
+
+    private static bool[] toolbarVisible = new bool[9];
+
     private int toolbarOption = 0;
-    private string[] toolbarTexts = { "欢迎", "Prefabs", "Textures", "Audio Clips", "Assets", "Folders", "Settings" };
+
+    private string[] toolbarTexts =
+        {"欢迎", "Prefabs", "Textures", "Audio Clips", "Assets", "Folders", "Notebook", "Settings",};
+
     private bool locateInProject = true;
+
     [MenuItem("Window/资源收藏器窗口")]
     public static void ShowWindow()
     {
         GetWindow<AssetCollectorWindow>("资源收藏器窗口");
     }
 
+    public AssetCollectorWindow()
+    {
+        for (int i = 0; i < toolbarVisible.Length; i++)
+        {
+            toolbarVisible[i] = true;
+        }
+    }
+
     private void OnEnable()
     {
         LoadAssets();
         locateInProject = EditorPrefs.GetBool(locateInProjectPrefKey, true);
+        notebookContent = EditorPrefs.GetString(notebookPrefKey, "");
+        for (int i = 0; i < toolbarVisible.Length; i++)
+        {
+            toolbarVisible[i] = EditorPrefs.GetBool(prefKey + "ToolbarVisible" + i, true);
+        }
     }
 
     private void OnGUI()
     {
-        toolbarOption = GUILayout.Toolbar(toolbarOption, toolbarTexts);
-
-        switch (toolbarOption)
+        List<string> visibleToolbarTexts = new List<string>();
+        List<int> visibleToolbarIndices = new List<int>();
+        for (int i = 0; i < toolbarTexts.Length; i++)
         {
-            case 0:
-                DisplayWelcome();
-                break;
-            case 1:
-                DisplayPrefabs(collectedPrefabs);
-                break;
-            case 2:
-                DisplayAssets(collectedTextures);
-                break;
-            case 3:
-                DisplayAssets(collectedAudioClips);
-                break;
-            case 4:
-                DisplayAssets(collectedAssets);
-                break;
-            case 5:
-                DisplayFolders(collectedFolders);
-                break;
-            case 6:
-                DisplaySettings();
-                break;
+            if (toolbarVisible[i])
+            {
+                visibleToolbarTexts.Add(toolbarTexts[i]);
+                visibleToolbarIndices.Add(i);
+            }
+        }
+
+        toolbarOption = GUILayout.Toolbar(toolbarOption, visibleToolbarTexts.ToArray());
+
+        if (toolbarOption < visibleToolbarIndices.Count)
+        {
+            switch (visibleToolbarIndices[toolbarOption])
+            {
+                case 0:
+                    DisplayWelcome();
+                    break;
+                case 1:
+                    DisplayPrefabs(collectedPrefabs);
+                    break;
+                case 2:
+                    DisplayAssets(collectedTextures);
+                    break;
+                case 3:
+                    DisplayAssets(collectedAudioClips);
+                    break;
+                case 4:
+                    DisplayAssets(collectedAssets);
+                    break;
+                case 5:
+                    DisplayFolders(collectedFolders);
+                    break;
+                case 6:
+                    DisplayNotebook();
+                    break;
+                case 7:
+                    DisplaySettings();
+                    break;
+            }
         }
     }
 
@@ -61,14 +103,20 @@ public class AssetCollectorWindow : EditorWindow
         EditorGUILayout.LabelField("欢迎使用资源收藏器窗口！", EditorStyles.boldLabel);
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("这个有啥用：", EditorStyles.boldLabel);
-        EditorGUILayout.HelpBox("我们223 225 227 这类项目场景众多，里面的小物件数不胜数，为了不再Project窗口理翻箱倒柜；老是不能快速的找到想要的预制体或者其他资源。所以这个插件的诞生就是解放你的搜索框。你可以把常用的预制体放进来，可以快速定位或者生成到你正在编辑的场景里，可谓是227好帮手啊！", MessageType.Info);
+        EditorGUILayout.HelpBox(
+            "我们223 225 227 这类项目场景众多，里面的小物件数不胜数，为了不再Project窗口理翻箱倒柜；老是不能快速的找到想要的预制体或者其他资源。所以这个插件的诞生就是解放你的搜索框。你可以把常用的预制体放进来，可以快速定位或者生成到你正在编辑的场景里，可谓是227好帮手啊！",
+            MessageType.Info);
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("用法描述：", EditorStyles.boldLabel);
-        EditorGUILayout.HelpBox("你可以直接在资源上右键选择 添加按钮 将资源和文件夹添加到收藏列表。在收藏列表中，你可以点击资源或文件夹来定位它们，也可以点击'删除'按钮来移除它们。", MessageType.Info);
+        EditorGUILayout.HelpBox("你可以直接在资源上右键选择 添加按钮 将资源和文件夹添加到收藏列表。在收藏列表中，你可以点击资源或文件夹来定位它们，也可以点击'删除'按钮来移除它们。",
+            MessageType.Info);
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("警告信息：", EditorStyles.boldLabel);
-        EditorStyles.label.normal.textColor = Color.red;
-        EditorGUILayout.HelpBox("请不要把插件上传到项目中，因为这是策划用GPT写的，可能会影响项目的代码，可能会有风险。所以自己在本地偷偷用就行", MessageType.Warning);
+        GUIStyle redTextStyle = new GUIStyle(EditorStyles.label);
+        redTextStyle.normal.textColor = Color.red;
+        redTextStyle.wordWrap = true;
+        EditorGUILayout.LabelField("请不要把插件上传到项目中，因为这是策划用GPT写的，可能会影响项目的代码，可能会有风险。所以自己在本地偷偷用就行", redTextStyle);
+
         EditorStyles.label.normal.textColor = Color.black;
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("感谢列表：", EditorStyles.boldLabel);
@@ -85,7 +133,7 @@ public class AssetCollectorWindow : EditorWindow
         {
             EditorGUILayout.BeginHorizontal();
             GUI.enabled = locateInProject;
-            GameObject newPrefab = (GameObject)EditorGUILayout.ObjectField(prefabs[i], typeof(GameObject), false);
+            GameObject newPrefab = (GameObject) EditorGUILayout.ObjectField(prefabs[i], typeof(GameObject), false);
             GUI.enabled = true;
             if (newPrefab != prefabs[i])
             {
@@ -95,16 +143,20 @@ public class AssetCollectorWindow : EditorWindow
                     EditorGUIUtility.PingObject(newPrefab);
                 }
             }
+
             if (GUILayout.Button("添加到场景"))
             {
                 PrefabUtility.InstantiatePrefab(prefabs[i]);
             }
+
             if (GUILayout.Button("删除"))
             {
                 prefabs.RemoveAt(i);
             }
+
             EditorGUILayout.EndHorizontal();
         }
+
         SaveAssets();
     }
 
@@ -114,7 +166,7 @@ public class AssetCollectorWindow : EditorWindow
         {
             EditorGUILayout.BeginHorizontal();
             GUI.enabled = locateInProject;
-            T newAsset = (T)EditorGUILayout.ObjectField(assets[i], typeof(T), false);
+            T newAsset = (T) EditorGUILayout.ObjectField(assets[i], typeof(T), false);
             GUI.enabled = true;
             if (!EqualityComparer<T>.Default.Equals(newAsset, assets[i]))
             {
@@ -124,12 +176,15 @@ public class AssetCollectorWindow : EditorWindow
                     EditorGUIUtility.PingObject(newAsset);
                 }
             }
+
             if (GUILayout.Button("删除"))
             {
                 assets.RemoveAt(i);
             }
+
             EditorGUILayout.EndHorizontal();
         }
+
         SaveAssets();
     }
 
@@ -143,23 +198,49 @@ public class AssetCollectorWindow : EditorWindow
             {
                 EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<Object>(folders[i]));
             }
+
             if (GUILayout.Button("删除"))
             {
                 folders.RemoveAt(i);
             }
+
             EditorGUILayout.EndHorizontal();
         }
+
         SaveAssets();
     }
 
     private void DisplaySettings()
     {
-        bool newLocateInProject = EditorGUILayout.Toggle("在Project窗口中定位资源", locateInProject);
-        if (newLocateInProject != locateInProject)
+        for (int i = 0; i < toolbarTexts.Length; i++)
         {
-            locateInProject = newLocateInProject;
-            EditorPrefs.SetBool(locateInProjectPrefKey, locateInProject);
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(toolbarTexts[i]);
+            if (i == toolbarTexts.Length - 1) // "Settings" 分页是最后一个分页
+            {
+                GUI.enabled = false;                                    // 禁用 GUI 控件
+                toolbarVisible[i] = EditorGUILayout.Toggle("显示", true); // 将 "Settings" 分页的显示切换设置为始终为 true
+                GUI.enabled = true;                                     // 启用 GUI 控件
+            }
+            else
+            {
+                toolbarVisible[i] = EditorGUILayout.Toggle("显示", toolbarVisible[i]);
+            }
+
+            EditorGUILayout.EndHorizontal();
         }
+    }
+
+    private void DisplayNotebook()
+    {
+        EditorGUILayout.BeginVertical();
+        if (GUILayout.Button("保存"))
+        {
+            SaveAssets();
+        }
+
+        notebookContent = EditorGUILayout.TextArea(notebookContent, GUILayout.Height(position.height - 30));
+        EditorGUILayout.EndVertical();
     }
 
     [MenuItem("Assets/添加到资源收藏器", false, 0)]
@@ -184,6 +265,7 @@ public class AssetCollectorWindow : EditorWindow
                 collectedAssets.Add(selectedObject);
             }
         }
+
         SaveAssets();
     }
 
@@ -198,6 +280,7 @@ public class AssetCollectorWindow : EditorWindow
                 collectedFolders.Add(path);
             }
         }
+
         SaveAssets();
     }
 
@@ -210,6 +293,7 @@ public class AssetCollectorWindow : EditorWindow
                 return true;
             }
         }
+
         return false;
     }
 
@@ -217,9 +301,14 @@ public class AssetCollectorWindow : EditorWindow
     {
         SaveAssetList(collectedPrefabs, prefKey + "Prefabs");
         SaveAssetList(collectedTextures, prefKey + "Textures");
-               SaveAssetList(collectedAudioClips, prefKey + "AudioClips");
+        SaveAssetList(collectedAudioClips, prefKey + "AudioClips");
         SaveAssetList(collectedAssets, prefKey + "Assets");
         SaveFolderList(collectedFolders, prefKey + "Folders");
+        EditorPrefs.SetString(notebookPrefKey, notebookContent);
+        for (int i = 0; i < toolbarVisible.Length; i++)
+        {
+            EditorPrefs.SetBool(prefKey + "ToolbarVisible" + i, toolbarVisible[i]);
+        }
     }
 
     private static void SaveAssetList<T>(List<T> assets, string key) where T : Object
@@ -229,6 +318,7 @@ public class AssetCollectorWindow : EditorWindow
         {
             assetPaths += AssetDatabase.GetAssetPath(asset) + ";";
         }
+
         EditorPrefs.SetString(key, assetPaths);
     }
 
@@ -239,6 +329,7 @@ public class AssetCollectorWindow : EditorWindow
         {
             folderPaths += folder + ";";
         }
+
         EditorPrefs.SetString(key, folderPaths);
     }
 
