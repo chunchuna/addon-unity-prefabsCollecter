@@ -1,9 +1,12 @@
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
+using System.Linq;
 
 public class AssetCollectorWindow : EditorWindow
 {
+    private static Dictionary<string, string> folderNames = new Dictionary<string, string>();
+    private Vector2 scrollPosition;
     private static List<GameObject> collectedPrefabs = new List<GameObject>();
     private static List<Texture> collectedTextures = new List<Texture>();
     private static List<AudioClip> collectedAudioClips = new List<AudioClip>();
@@ -97,9 +100,10 @@ public class AssetCollectorWindow : EditorWindow
             }
         }
     }
-
     private void DisplayWelcome()
+
     {
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
         EditorGUILayout.LabelField("欢迎使用资源收藏器窗口！", EditorStyles.boldLabel);
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("这个有啥用：", EditorStyles.boldLabel);
@@ -125,15 +129,17 @@ public class AssetCollectorWindow : EditorWindow
         EditorGUILayout.HelpBox("！", MessageType.Info);
         EditorGUILayout.HelpBox("！！", MessageType.Info);
         EditorGUILayout.HelpBox("有其他bug或者需求请告知我 反正我也不一定会改", MessageType.Info);
+        EditorGUILayout.EndScrollView();
     }
-
     private void DisplayPrefabs(List<GameObject> prefabs)
+
     {
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
         for (int i = 0; i < prefabs.Count; i++)
         {
             EditorGUILayout.BeginHorizontal();
             GUI.enabled = locateInProject;
-            GameObject newPrefab = (GameObject) EditorGUILayout.ObjectField(prefabs[i], typeof(GameObject), false);
+            GameObject newPrefab = (GameObject)EditorGUILayout.ObjectField(prefabs[i], typeof(GameObject), false);
             GUI.enabled = true;
             if (newPrefab != prefabs[i])
             {
@@ -158,15 +164,17 @@ public class AssetCollectorWindow : EditorWindow
         }
 
         SaveAssets();
+        EditorGUILayout.EndScrollView();
     }
 
     private void DisplayAssets<T>(List<T> assets) where T : Object
     {
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
         for (int i = 0; i < assets.Count; i++)
         {
             EditorGUILayout.BeginHorizontal();
             GUI.enabled = locateInProject;
-            T newAsset = (T) EditorGUILayout.ObjectField(assets[i], typeof(T), false);
+            T newAsset = (T)EditorGUILayout.ObjectField(assets[i], typeof(T), false);
             GUI.enabled = true;
             if (!EqualityComparer<T>.Default.Equals(newAsset, assets[i]))
             {
@@ -186,32 +194,45 @@ public class AssetCollectorWindow : EditorWindow
         }
 
         SaveAssets();
+        EditorGUILayout.EndScrollView();
     }
 
     private void DisplayFolders(List<string> folders)
     {
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
         for (int i = 0; i < folders.Count; i++)
         {
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(folders[i]);
+            string path = folders[i];
+            if (folderNames.ContainsKey(path))
+            {
+                folderNames[path] = EditorGUILayout.TextField(folderNames[path]);
+            }
+            else
+            {
+                folderNames[path] = EditorGUILayout.TextField(path);
+            }
+
             if (GUILayout.Button("定位"))
             {
-                EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<Object>(folders[i]));
+                var obj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
+                EditorGUIUtility.PingObject(obj);
             }
 
             if (GUILayout.Button("删除"))
             {
                 folders.RemoveAt(i);
             }
-
             EditorGUILayout.EndHorizontal();
         }
 
         SaveAssets();
+        EditorGUILayout.EndScrollView();
     }
 
     private void DisplaySettings()
     {
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
         for (int i = 0; i < toolbarTexts.Length; i++)
         {
             EditorGUILayout.BeginHorizontal();
@@ -229,10 +250,12 @@ public class AssetCollectorWindow : EditorWindow
 
             EditorGUILayout.EndHorizontal();
         }
+        EditorGUILayout.EndScrollView();
     }
 
     private void DisplayNotebook()
     {
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
         EditorGUILayout.BeginVertical();
         if (GUILayout.Button("保存"))
         {
@@ -241,6 +264,7 @@ public class AssetCollectorWindow : EditorWindow
 
         notebookContent = EditorGUILayout.TextArea(notebookContent, GUILayout.Height(position.height - 30));
         EditorGUILayout.EndVertical();
+        EditorGUILayout.EndScrollView();
     }
 
     [MenuItem("Assets/添加到资源收藏器", false, 0)]
@@ -299,11 +323,14 @@ public class AssetCollectorWindow : EditorWindow
 
     private static void SaveAssets()
     {
+        var folderNamesString = string.Join(";", folderNames.Select(kv => kv.Key + ":" + kv.Value));
+        EditorPrefs.SetString(prefKey + "FolderNames", folderNamesString);
         SaveAssetList(collectedPrefabs, prefKey + "Prefabs");
         SaveAssetList(collectedTextures, prefKey + "Textures");
         SaveAssetList(collectedAudioClips, prefKey + "AudioClips");
         SaveAssetList(collectedAssets, prefKey + "Assets");
         SaveFolderList(collectedFolders, prefKey + "Folders");
+
         EditorPrefs.SetString(notebookPrefKey, notebookContent);
         for (int i = 0; i < toolbarVisible.Length; i++)
         {
@@ -346,6 +373,11 @@ public class AssetCollectorWindow : EditorWindow
         LoadAssetList(collectedAudioClips, prefKey + "AudioClips");
         LoadAssetList(collectedAssets, prefKey + "Assets");
         LoadFolderList(collectedFolders, prefKey + "Folders");
+        var folderNamesString = EditorPrefs.GetString(prefKey + "FolderNames", "");
+        // 将字符串转换回folderNames字典
+        folderNames = folderNamesString.Split(';')
+            .Select(s => s.Split(':'))
+            .ToDictionary(arr => arr[0], arr => arr[1]);
     }
 
     private void LoadAssetList<T>(List<T> assets, string key) where T : Object
